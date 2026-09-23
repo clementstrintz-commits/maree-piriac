@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -55,6 +56,11 @@ def http_get(url, essais=3):
             req = urllib.request.Request(url, headers=UA)
             with urllib.request.urlopen(req, timeout=60) as r:
                 return r.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            if e.code < 500:
+                raise RuntimeError(f"requête refusée ({e.code})") from None
+            log(f"  échec {i + 1}/{essais} : {e}")
+            time.sleep(3 * (i + 1))
         except Exception as e:  # noqa: BLE001
             log(f"  échec {i + 1}/{essais} : {e}")
             time.sleep(3 * (i + 1))
@@ -93,22 +99,27 @@ def trouver_station():
     return int(g["shom_id"]), g["name"]
 
 
-def telecharger(sid, debut, fin, sources):
-    """Observations entre debut et fin (UTC), par tranches de 30 jours."""
+def telecharger(sid, debut, fin, sources=("1", "2", "4", "3")):
+    """Observations entre debut et fin (UTC), par tranches de 30 jours.
+    Pour chaque tranche, essaie les sources dans l'ordre jusqu'à en trouver une."""
     t_all, h_all = [], []
     cur = debut
     while cur < fin:
         nxt = min(cur + timedelta(days=30), fin)
-        q = urllib.parse.urlencode({
-            "sources": sources,
-            "dtStart": cur.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "dtEnd": nxt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
-        try:
-            data = json.loads(http_get(f"{BASE}/observation/json/{sid}?{q}")).get("data", [])
-        except Exception as e:  # noqa: BLE001
-            log(f"  tranche {cur:%Y-%m-%d} ignorée : {e}")
-            data = []
+        data, erreurs = [], []
+        for src in sources:
+            url = (f"{BASE}/observation/json/{sid}?sources={src}"
+                   f"&dtStart={cur:%Y-%m-%d}&dtEnd={nxt:%Y-%m-%d}")
+            try:
+                data = json.loads(http_get(url)).get("data", [])
+            except Exception as e:  # noqa: BLE001
+                erreurs.append(f"source {src} : {e}")
+                data = []
+            if data:
+                break
+        if not data:
+            log(f"  pas de mesures du {cur:%Y-%m-%d} au {nxt:%Y-%m-%d}"
+                + (f" ({'; '.join(erreurs)})" if erreurs else ""))
         for d in data:
             v = d.get("value")
             if v is None:
@@ -150,7 +161,7 @@ def ajuster(sid):
     fin = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     debut = fin - timedelta(days=CFG.get("jours_analyse", 365))
     log(f"Analyse harmonique : téléchargement {debut:%Y-%m-%d} → {fin:%Y-%m-%d}…")
-    t, h = telecharger(sid, debut, fin, "0")
+    t, h = telecharger(sid, debut, fin)
     t, h = moyenner(t, h, 1.0, filtre_median=False)
     if len(t) < 24 * 30:
         raise RuntimeError(f"Trop peu de mesures pour l'analyse ({len(t)} heures).")
@@ -205,16 +216,21 @@ def ms(t_h):
 
 def main():
     sid, nom = trouver_station()
-    modele = charger_harmoniques(sid)
+    try:
+        modele = charger_harmoniques(sid)
+    except RuntimeError as e:
+        secours = int(CFG.get("station_secours", 37))
+        if sid == secours:
+            raise
+        log(f"{e} Bascule sur le marégraphe de secours (identifiant {secours}).")
+        sid, nom = secours, CFG.get("station_secours_nom", "SAINT-NAZAIRE")
+        modele = charger_harmoniques(sid)
     now = datetime.now(timezone.utc)
     t_now = heures(now)
 
-    t_obs, h_obs = np.array([]), np.array([])
-    for src in ("1", "2", "0"):
-        t_obs, h_obs = telecharger(sid, now - timedelta(hours=40), now + timedelta(hours=1), src)
-        if len(t_obs):
-            log(f"Mesures récentes : source {src}, {len(t_obs)} points")
-            break
+    t_obs, h_obs = telecharger(sid, now - timedelta(hours=48), now + timedelta(days=1))
+    t_obs, h_obs = t_obs[t_obs > t_now - 40], h_obs[t_obs > t_now - 40]
+    log(f"Mesures récentes : {len(t_obs)} points")
     t_obs, h_obs = moyenner(t_obs, h_obs, 5 / 60)
 
     pas = 10 / 60

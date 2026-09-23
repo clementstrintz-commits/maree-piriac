@@ -7,5 +7,7 @@
   "seuil_baignade_m": 3.0,
   "decalage_minutes": 0,
   "decalage_hauteur_m": 0.0,
-  "jours_analyse": 365
+  "jours_analyse": 365,
+  "station_secours": 37,
+  "station_secours_nom": "SAINT-NAZAIRE"
 }
