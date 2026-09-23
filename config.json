@@ -1,7 +1,9 @@
 {
   "lieu": "Piriac-sur-Mer",
-  "station_nom": "CROISIC",
-  "station_id": null,
+  "latitude": 47.38,
+  "longitude": -2.545,
+  "station_id": 6410,
+  "station_nom": "KERCABELLEC",
   "seuil_baignade_m": 3.0,
   "decalage_minutes": 0,
   "decalage_hauteur_m": 0.0,

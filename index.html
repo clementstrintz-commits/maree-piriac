@@ -279,13 +279,18 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
     $("courbe").setAttribute("aria-label", `Courbe de hauteur d'eau, ${bains.length} créneaux au-dessus de ${metres(seuil)} sur les prochaines 36 heures`);
   }
 
+  function nomStation() {
+    const n = (data.station && data.station.nom) || "";
+    return n.toLowerCase().replace(/_/g, " ").replace(/(^|[\s-])\S/g, (c) => c.toUpperCase());
+  }
+
   function rendrePied() {
     const age = (Date.now() - Date.parse(data.maj)) / 60e3;
     const vieux = age > 40;
     const a = data.analyse || {};
     $("pied").innerHTML =
       `<span class="${vieux ? "alerte" : ""}">Mis à jour à ${heure(Date.parse(data.maj))}${vieux ? ` (il y a ${Math.round(age)} min)` : ""}.</span> ` +
-      `Mesures REFMAR/SHOM, marégraphe du Croisic. Prévision calculée sur ${a.duree_jours || "?"} jours de mesures` +
+      `Mesures REFMAR/SHOM, marégraphe de ${nomStation()}. Prévision calculée sur ${a.duree_jours || "?"} jours de mesures` +
       (a.ecart_type_m != null ? ` (écart type ${Math.round(a.ecart_type_m * 100)} cm, surcotes comprises)` : "") + ".";
   }
 

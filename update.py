@@ -5,7 +5,6 @@ une prédiction harmonique à partir d'un an de mesures du même marégraphe.
 """
 import json
 import os
-import re
 import sys
 import time
 import urllib.parse
@@ -67,27 +66,31 @@ def heures(dt):
 
 
 def trouver_station():
-    if CFG.get("station_id"):
-        return int(CFG["station_id"]), CFG.get("station_nom", "")
-    nom = CFG.get("station_nom", "CROISIC").upper()
-    log(f"Recherche de l'identifiant du marégraphe « {nom} »…")
-    xml = http_get(f"{BASE}/sos/service?request=GetCapabilities")
-    blocs = re.split(r"ObservationOffering", xml)
-    for bloc in blocs:
-        if nom in bloc.upper():
-            m = re.search(r"(?:procedure/|offering_)(\d+)", bloc)
-            if m:
-                log(f"  trouvé : identifiant {m.group(1)}")
-                return int(m.group(1)), nom
-    for m in re.finditer(nom, xml.upper()):
-        fen = xml[max(0, m.start() - 3000): m.start()]
-        ids = re.findall(r"(?:procedure/|offering_)(\d+)", fen)
-        if ids:
-            log(f"  trouvé (approx.) : identifiant {ids[-1]}")
-            return int(ids[-1]), nom
-    raise RuntimeError(
-        f"Marégraphe « {nom} » introuvable. Renseignez station_id dans config.json."
-    )
+    """Identifiant du marégraphe : celui de config.json s'il est en service,
+    sinon le plus proche du lieu qui fonctionne."""
+    try:
+        liste = json.loads(http_get(f"{BASE}/service/tidegauges"))
+    except Exception as e:  # noqa: BLE001
+        liste = []
+        log(f"Liste des marégraphes indisponible : {e}")
+    par_id = {int(g["shom_id"]): g for g in liste if str(g.get("shom_id", "")).isdigit()}
+    sid = CFG.get("station_id")
+    if sid:
+        g = par_id.get(int(sid))
+        if g is None or g.get("state") in ("OK", "ASYNC", "PB"):
+            nom = g["name"] if g else CFG.get("station_nom", str(sid))
+            log(f"Marégraphe : {nom} (identifiant {sid}, état {g.get('state') if g else '?'})")
+            return int(sid), nom
+        log(f"Marégraphe {g['name']} hors service (état {g.get('state')}), recherche du plus proche…")
+    lat, lon = CFG.get("latitude", 47.38), CFG.get("longitude", -2.545)
+    actifs = [g for g in liste if g.get("state") == "OK"]
+    if not actifs:
+        raise RuntimeError("Aucun marégraphe en service trouvé. Renseignez station_id dans config.json.")
+    def dist(g):
+        return (g["latitude"] - lat) ** 2 + ((g["longitude"] - lon) * 0.68) ** 2
+    g = min(actifs, key=dist)
+    log(f"Marégraphe le plus proche en service : {g['name']} (identifiant {g['shom_id']})")
+    return int(g["shom_id"]), g["name"]
 
 
 def telecharger(sid, debut, fin, sources):
@@ -164,6 +167,8 @@ def ajuster(sid):
     coef, *_ = np.linalg.lstsq(matrice(t, noms), h, rcond=None)
     rms = float(np.sqrt(np.mean((matrice(t, noms) @ coef - h) ** 2)))
     log(f"  {len(t)} heures, {duree:.0f} jours, {len(noms)} composantes, écart type {rms:.3f} m")
+    if rms > 0.25:
+        log("  ATTENTION : prévision peu fiable pour ce marégraphe (écart type élevé).")
     return {
         "station_id": sid,
         "mois": datetime.now(timezone.utc).strftime("%Y-%m"),
