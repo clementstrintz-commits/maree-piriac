@@ -1,0 +1,9 @@
+{
+  "lieu": "Piriac-sur-Mer",
+  "station_nom": "CROISIC",
+  "station_id": null,
+  "seuil_baignade_m": 3.0,
+  "decalage_minutes": 0,
+  "decalage_hauteur_m": 0.0,
+  "jours_analyse": 365
+}

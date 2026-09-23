@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Marée Piriac</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Marée">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icone.png">
+<link rel="icon" href="icone.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --fond: #f3f6f6; --encre: #14222c; --granit: #56646d; --trait: #d6dfe2;
+  --mer: #1f5673; --mer-voile: rgba(31, 86, 115, .14);
+  --algue: #25774d; --algue-voile: rgba(37, 119, 77, .28);
+  --sable: #b8862f; --alerte: #a2452c;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #0e1a21; --encre: #e4ecee; --granit: #93a3ab; --trait: #22343e;
+    --mer: #6aa8c8; --mer-voile: rgba(106, 168, 200, .16);
+    --algue: #5cc48c; --algue-voile: rgba(92, 196, 140, .30);
+    --sable: #e0b45e; --alerte: #e58a6d;
+    color-scheme: dark;
+  }
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--fond); color: var(--encre);
+  font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 17px; line-height: 1.45;
+}
+main { max-width: 640px; margin: 0 auto; padding: 20px 20px 32px; }
+.lieu { color: var(--granit); font-size: 15px; margin: 4px 0 6px; }
+h1 {
+  font-size: clamp(32px, 9vw, 46px); line-height: 1.05; margin: 0 0 10px;
+  font-weight: 700; letter-spacing: -0.01em;
+}
+h1.oui { color: var(--algue); }
+.etat { margin: 0; color: var(--granit); max-width: 34em; }
+.etat strong { color: var(--encre); font-weight: 700; }
+.courbe { margin: 22px -20px 6px; }
+.courbe svg { display: block; width: 100%; height: auto; }
+.legende { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--granit); margin: 0 0 22px; }
+.legende span::before {
+  content: ""; display: inline-block; width: 16px; height: 0; vertical-align: middle;
+  margin-right: 6px; border-top: 3px solid var(--mer);
+}
+.legende .l-pred::before { border-top: 2px dashed var(--mer); }
+.legende .l-seuil::before { border-top: 2px solid var(--sable); }
+.legende .l-bain::before { border-top: 8px solid var(--algue-voile); }
+section { border-top: 1px solid var(--trait); padding: 16px 0 4px; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+.creneaux { list-style: none; margin: 0; padding: 0; }
+.creneaux li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-variant-numeric: tabular-nums; }
+.creneaux .duree { color: var(--granit); }
+.vide { color: var(--granit); margin: 0 0 8px; }
+.seuil { display: flex; align-items: center; gap: 12px; margin: 6px 0 4px; }
+.seuil button {
+  width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid var(--trait);
+  background: transparent; color: var(--encre); font: inherit; font-size: 24px; cursor: pointer;
+}
+.seuil button:focus-visible { outline: 3px solid var(--mer); outline-offset: 2px; }
+.seuil output { font-size: 28px; font-weight: 700; min-width: 4.2em; text-align: center; font-variant-numeric: tabular-nums; color: var(--sable); }
+.aide { font-size: 14px; color: var(--granit); margin: 6px 0 0; }
+footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
+.alerte { color: var(--alerte); }
+</style>
+</head>
+<body>
+<main>
+  <p class="lieu" id="lieu">Piriac-sur-Mer</p>
+  <h1 id="titre">Chargement…</h1>
+  <p class="etat" id="etat"></p>
+
+  <div class="courbe" id="courbe" role="img" aria-label="Courbe de hauteur d'eau"></div>
+  <div class="legende">
+    <span>Mesurée</span><span class="l-pred">Prévue</span><span class="l-seuil">Ton seuil</span><span class="l-bain">Baignable</span>
+  </div>
+
+  <section>
+    <h2>Aujourd'hui</h2>
+    <ul class="creneaux" id="auj"></ul>
+  </section>
+  <section>
+    <h2>Demain</h2>
+    <ul class="creneaux" id="dem"></ul>
+  </section>
+
+  <section>
+    <h2>Hauteur d'eau minimale pour se baigner</h2>
+    <div class="seuil">
+      <button type="button" id="moins" aria-label="Baisser le seuil de 10 cm">−</button>
+      <output id="valeur-seuil">3,00 m</output>
+      <button type="button" id="plus" aria-label="Monter le seuil de 10 cm">+</button>
+    </div>
+    <p class="aide">Hauteur au-dessus du zéro des cartes, comme dans l'annuaire des marées. Réglage enregistré sur ce téléphone.</p>
+  </section>
+
+  <footer id="pied"></footer>
+</main>
+
+<script>
+(() => {
+  const H = 3600e3;
+  const TZ = "Europe/Paris";
+  const fmtH = new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+  const fmtJ = new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+  const heure = (t) => fmtH.format(new Date(t)).replace(":", " h ");
+  const jour = (t) => fmtJ.format(new Date(t));
+  const fmtHeure = new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
+  const fmtJS = new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, weekday: "short" });
+  const metres = (h) => h.toFixed(2).replace(".", ",") + " m";
+  const $ = (id) => document.getElementById(id);
+
+  let cfg = {}, data = null, seuil = 3.0;
+
+  function lireSeuil() {
+    try { const v = parseFloat(localStorage.getItem("seuil")); if (!isNaN(v)) return v; } catch (e) {}
+    return typeof cfg.seuil_baignade_m === "number" ? cfg.seuil_baignade_m : 3.0;
+  }
+  function ecrireSeuil(v) { try { localStorage.setItem("seuil", String(v)); } catch (e) {} }
+
+  // Séries corrigées du décalage Croisic → Piriac et de l'écart mesuré
+  function series() {
+    const dt = (cfg.decalage_minutes || 0) * 60e3;
+    const dh = cfg.decalage_hauteur_m || 0;
+    const now = Date.now();
+    const mes = data.mesures.map(([t, h]) => [t + dt, h + dh]);
+    const pred = data.prediction.map(([t, h]) => [t + dt, h + dh]);
+    const s = data.surcote_m || 0;
+    const corr = pred.map(([t, h]) => [t, t > now ? h + s * Math.exp(-(t - now) / (12 * H)) : h + s]);
+    return { mes, pred, corr, now };
+  }
+
+  function valeurA(serie, t) {
+    for (let i = 1; i < serie.length; i++) {
+      if (serie[i][0] >= t) {
+        const [t0, h0] = serie[i - 1], [t1, h1] = serie[i];
+        return h0 + (h1 - h0) * (t - t0) / (t1 - t0);
+      }
+    }
+    return null;
+  }
+
+  // Créneaux où la hauteur dépasse le seuil
+  function creneaux(serie, s) {
+    const out = [];
+    let debut = serie.length && serie[0][1] >= s ? serie[0][0] : null;
+    for (let i = 1; i < serie.length; i++) {
+      const [t0, h0] = serie[i - 1], [t1, h1] = serie[i];
+      if ((h0 < s) !== (h1 < s)) {
+        const tc = t0 + (t1 - t0) * (s - h0) / (h1 - h0);
+        if (h1 >= s) debut = tc; else if (debut !== null) { out.push([debut, tc]); debut = null; }
+      }
+    }
+    if (debut !== null) out.push([debut, serie[serie.length - 1][0], true]);
+    return out;
+  }
+
+  function dureeTxt(ms) {
+    const m = Math.round(ms / 60e3), h = Math.floor(m / 60), r = m % 60;
+    return h ? `${h} h ${String(r).padStart(2, "0")}` : `${r} min`;
+  }
+
+  function rendreEtat(S) {
+    const { mes, corr, now } = S;
+    const dernier = mes.length ? mes[mes.length - 1] : null;
+    const frais = dernier && now - dernier[0] < 45 * 60e3;
+    const hNow = frais ? dernier[1] : valeurA(corr, now);
+    const hApres = valeurA(corr, now + 30 * 60e3);
+    const futur = corr.filter(([t]) => t >= now - 10 * 60e3);
+    const cr = creneaux(futur, seuil);
+    const titre = $("titre");
+    let phrase;
+    if (hNow !== null && hNow >= seuil) {
+      const fin = cr.length ? cr[0][1] : null;
+      titre.textContent = fin ? `Baignable jusqu'à ${heure(fin)}` : "Baignable maintenant";
+      titre.className = "oui";
+    } else {
+      const proch = cr.find(([a]) => a > now);
+      titre.textContent = proch ? `Baignable à ${heure(proch[0])}` : "Pas de créneau prévu";
+      titre.className = "";
+      if (proch && !proch[2]) phrase = `jusqu'à ${heure(proch[1])}`;
+    }
+    const sens = hApres === null || hNow === null ? "" : hApres > hNow + 0.02 ? "Mer montante" : hApres < hNow - 0.02 ? "Mer descendante" : "Étale";
+    let txt = "";
+    if (hNow !== null) {
+      txt = `${sens}, <strong>${metres(hNow)}</strong> ${frais ? `mesurés à ${heure(dernier[0])}` : "estimés (pas de mesure récente)"}`;
+      if (phrase) txt += `. Créneau ${phrase}`;
+      if (data.surcote_m !== null && Math.abs(data.surcote_m) >= 0.05) {
+        txt += `. La mer est ${data.surcote_m > 0 ? "plus haute" : "plus basse"} que prévu de ${Math.abs(data.surcote_m * 100).toFixed(0)} cm, c'est pris en compte`;
+      }
+      txt += ".";
+    }
+    $("etat").innerHTML = txt;
+  }
+
+  function rendreCreneaux(S) {
+    const { corr, now } = S;
+    const auj = jour(now), dem = jour(now + 24 * H);
+    const cr = creneaux(corr, seuil);
+    for (const [id, j] of [["auj", auj], ["dem", dem]]) {
+      const ul = $(id);
+      ul.innerHTML = "";
+      const liste = cr.filter(([a, b]) => jour(a) === j || jour(b) === j);
+      if (!liste.length) { ul.innerHTML = `<li class="vide">Jamais au-dessus de ${metres(seuil)}</li>`; continue; }
+      for (const [a, b, ouvert] of liste) {
+        const li = document.createElement("li");
+        const passe = b < now ? " (passé)" : "";
+        li.innerHTML = `<span>${heure(a)} → ${ouvert ? "…" : heure(b)}${passe}</span><span class="duree">${ouvert ? "" : dureeTxt(b - a)}</span>`;
+        ul.appendChild(li);
+      }
+    }
+  }
+
+  function rendreCourbe(S) {
+    const { mes, pred, corr, now } = S;
+    const t0 = now - 12 * H, t1 = now + 36 * H;
+    const dans = (s) => s.filter(([t]) => t >= t0 && t <= t1);
+    const p = dans(pred), c = dans(corr).filter(([t]) => t >= now), m = dans(mes);
+    const tous = [...p, ...c, ...m].map(([, h]) => h).concat([seuil]);
+    if (!tous.length) return;
+    let hmin = Math.min(...tous), hmax = Math.max(...tous);
+    hmin = Math.floor(hmin * 2) / 2 - 0.25; hmax = Math.ceil(hmax * 2) / 2 + 0.25;
+    const W = 420, Hh = 230, g = 34, d = 8, hHaut = 10, hBas = 26;
+    const x = (t) => g + (t - t0) / (t1 - t0) * (W - g - d);
+    const y = (h) => hHaut + (hmax - h) / (hmax - hmin) * (Hh - hHaut - hBas);
+    const chemin = (s) => s.map(([t, h], i) => `${i ? "L" : "M"}${x(t).toFixed(1)},${y(h).toFixed(1)}`).join("");
+    const aire = (s) => s.length ? `${chemin(s)}L${x(s[s.length - 1][0]).toFixed(1)},${y(hmin)}L${x(s[0][0]).toFixed(1)},${y(hmin)}Z` : "";
+
+    // Courbe de référence pour l'eau : mesures passées + prévision corrigée
+    const passe = m.length ? m : p.filter(([t]) => t <= now);
+    const eau = [...passe, ...c];
+    const bains = creneaux(eau, seuil);
+    let svg = `<svg viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<defs><clipPath id="au-dessus"><rect x="0" y="0" width="${W}" height="${y(seuil)}"/></clipPath></defs>`;
+    // graduations
+    for (let h = Math.ceil(hmin); h <= hmax; h++) {
+      svg += `<line x1="${g}" x2="${W - d}" y1="${y(h)}" y2="${y(h)}" stroke="var(--trait)" stroke-width="1"/>`;
+      svg += `<text x="${g - 6}" y="${y(h) + 4}" text-anchor="end" font-size="12" fill="var(--granit)">${h} m</text>`;
+    }
+    // minuits et midis
+    for (let t = Math.ceil(t0 / H) * H; t <= t1; t += H) {
+      const hh = Number(fmtHeure.formatToParts(new Date(t)).find((q) => q.type === "hour").value) % 24;
+      if ((hh === 0 || hh === 12) && x(t) < W - d - 34) {
+        svg += `<line x1="${x(t)}" x2="${x(t)}" y1="${hHaut}" y2="${Hh - hBas}" stroke="var(--trait)" stroke-width="1" ${hh === 12 ? 'stroke-dasharray="2 4"' : ""}/>`;
+        const lab = hh === 0 ? fmtJS.format(new Date(t)) : "12 h";
+        svg += `<text x="${x(t) + 4}" y="${Hh - 8}" font-size="12" fill="var(--granit)">${lab}</text>`;
+      }
+    }
+    // eau
+    svg += `<path d="${aire(eau)}" fill="var(--mer-voile)"/>`;
+    svg += `<path d="${aire(eau)}" fill="var(--algue-voile)" clip-path="url(#au-dessus)"/>`;
+    // prédiction brute
+    svg += `<path d="${chemin(p)}" fill="none" stroke="var(--mer)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".75"/>`;
+    // prévision corrigée
+    if (c.length) svg += `<path d="${chemin(c)}" fill="none" stroke="var(--mer)" stroke-width="2" opacity=".55"/>`;
+    // mesures
+    if (m.length) svg += `<path d="${chemin(m)}" fill="none" stroke="var(--mer)" stroke-width="3" stroke-linejoin="round"/>`;
+    // seuil
+    svg += `<line x1="${g}" x2="${W - d}" y1="${y(seuil)}" y2="${y(seuil)}" stroke="var(--sable)" stroke-width="2"/>`;
+    // maintenant
+    const hNow = valeurA(eau, now);
+    svg += `<line x1="${x(now)}" x2="${x(now)}" y1="${hHaut}" y2="${Hh - hBas}" stroke="var(--encre)" stroke-width="1.5"/>`;
+    if (hNow !== null) svg += `<circle cx="${x(now)}" cy="${y(hNow)}" r="5.5" fill="var(--encre)" stroke="var(--fond)" stroke-width="2"/>`;
+    svg += `</svg>`;
+    $("courbe").innerHTML = svg;
+    $("courbe").setAttribute("aria-label", `Courbe de hauteur d'eau, ${bains.length} créneaux au-dessus de ${metres(seuil)} sur les prochaines 36 heures`);
+  }
+
+  function rendrePied() {
+    const age = (Date.now() - Date.parse(data.maj)) / 60e3;
+    const vieux = age > 40;
+    const a = data.analyse || {};
+    $("pied").innerHTML =
+      `<span class="${vieux ? "alerte" : ""}">Mis à jour à ${heure(Date.parse(data.maj))}${vieux ? ` (il y a ${Math.round(age)} min)` : ""}.</span> ` +
+      `Mesures REFMAR/SHOM, marégraphe du Croisic. Prévision calculée sur ${a.duree_jours || "?"} jours de mesures` +
+      (a.ecart_type_m != null ? ` (écart type ${Math.round(a.ecart_type_m * 100)} cm, surcotes comprises)` : "") + ".";
+  }
+
+  function rendre() {
+    if (!data) return;
+    $("valeur-seuil").textContent = metres(seuil);
+    const S = series();
+    rendreEtat(S); rendreCourbe(S); rendreCreneaux(S); rendrePied();
+  }
+
+  async function charger() {
+    try {
+      const [c, d] = await Promise.all([
+        fetch("config.json?v=" + Date.now()).then((r) => r.json()).catch(() => ({})),
+        fetch("data.json?v=" + Date.now()).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      ]);
+      const premier = !data;
+      cfg = c; data = d;
+      if (premier) seuil = lireSeuil();
+      if (cfg.lieu) $("lieu").textContent = cfg.lieu;
+      rendre();
+    } catch (e) {
+      if (!data) {
+        $("titre").textContent = "Données indisponibles";
+        $("etat").textContent = "Le fichier de données n'a pas encore été publié. Lance la mise à jour dans l'onglet Actions de GitHub, puis recharge la page.";
+      }
+    }
+  }
+
+  function changer(delta) {
+    seuil = Math.round((seuil + delta) * 10) / 10;
+    seuil = Math.max(0, Math.min(8, seuil));
+    ecrireSeuil(seuil); rendre();
+  }
+  $("moins").addEventListener("click", () => changer(-0.1));
+  $("plus").addEventListener("click", () => changer(0.1));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) charger(); });
+  setInterval(charger, 5 * 60e3);
+  setInterval(rendre, 60e3);
+  charger();
+})();
+</script>
+</body>
+</html>
