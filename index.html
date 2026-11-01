@@ -121,7 +121,7 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
   const metres = (h) => h.toFixed(2).replace(".", ",") + " m";
   const $ = (id) => document.getElementById(id);
 
-  const VERSION = "2026-11-01-seuil-fixe";
+  const VERSION = "2026-11-01-etat-v2";
   let cfg = {}, data = null, seuil = 3.65;
 
   function lireSeuil() {
@@ -174,15 +174,16 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
   function rendreEtat(S) {
     const { mes, corr, now } = S;
     const dernier = mes.length ? mes[mes.length - 1] : null;
-    const frais = dernier && now - dernier[0] < 45 * 60e3;
-    const hNow = frais ? dernier[1] : valeurA(corr, now);
-    const hApres = valeurA(corr, now + 30 * 60e3);
-    const futur = corr.filter(([t]) => t >= now - 10 * 60e3);
-    const cr = creneaux(futur, seuil);
+    const recent = dernier && now - dernier[0] < 15 * 60e3;
+    // Hauteur actuelle : mesure très récente, sinon prévision recalée sur les dernières mesures
+    const hNow = recent ? dernier[1] : valeurA(corr, now);
+    const hAvant = valeurA(corr, now - 15 * 60e3), hApres = valeurA(corr, now + 15 * 60e3);
+    const cr = creneaux(corr, seuil);
+    const enCours = cr.find(([a, b]) => a <= now && b > now);
     const titre = $("titre");
     let phrase;
-    if (hNow !== null && hNow >= seuil) {
-      const fin = cr.length ? cr[0][1] : null;
+    if (enCours || (hNow !== null && hNow >= seuil)) {
+      const fin = enCours && !enCours[2] ? enCours[1] : (cr.find(([, b]) => b > now) || [])[1];
       titre.textContent = fin ? `Baignable jusqu'à ${heure(fin)}` : "Baignable maintenant";
       titre.className = "oui";
     } else {
@@ -191,10 +192,13 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
       titre.className = "";
       if (proch && !proch[2]) phrase = `jusqu'à ${heure(proch[1])}`;
     }
-    const sens = hApres === null || hNow === null ? "" : hApres > hNow + 0.02 ? "Mer montante" : hApres < hNow - 0.02 ? "Mer descendante" : "Étale";
+    const sens = hAvant === null || hApres === null ? "" : hApres > hAvant + 0.03 ? "Mer montante" : hApres < hAvant - 0.03 ? "Mer descendante" : "Étale";
     let txt = "";
     if (hNow !== null) {
-      txt = `${sens}, <strong>${metres(hNow)}</strong> ${frais ? `mesurés à ${heure(dernier[0])}` : "estimés (pas de mesure récente)"}`;
+      txt = recent
+        ? `${sens}, <strong>${metres(hNow)}</strong> mesurés à ${heure(dernier[0])}`
+        : `${sens}, environ <strong>${metres(hNow)}</strong> maintenant`;
+      if (!recent && dernier) txt += ` (dernière mesure : ${metres(dernier[1])} à ${heure(dernier[0])})`;
       if (phrase) txt += `. Créneau ${phrase}`;
       if (data.surcote_m !== null && Math.abs(data.surcote_m) >= 0.05) {
         txt += `. La mer est ${data.surcote_m > 0 ? "plus haute" : "plus basse"} que prévu de ${Math.abs(data.surcote_m * 100).toFixed(0)} cm, c'est pris en compte`;
