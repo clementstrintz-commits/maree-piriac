@@ -12,11 +12,12 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   mise-a-jour:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deploiement.outputs.page_url }}
@@ -34,6 +35,7 @@ jobs:
           key: harmoniques-${{ steps.mois.outputs.m }}
           restore-keys: harmoniques-
       - run: python update.py
+        timeout-minutes: 10
       - run: cp index.html config.json icone.png site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
