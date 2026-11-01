@@ -50,11 +50,15 @@ def log(*a):
     print(*a, flush=True)
 
 
-def http_get(url, essais=3):
+DEBUT = time.time()
+BUDGET_S = 8 * 60  # le script s'arrête proprement au-delà
+
+
+def http_get(url, essais=2):
     for i in range(essais):
         try:
             req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=25) as r:
                 return r.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as e:
             if e.code < 500:
@@ -105,6 +109,9 @@ def telecharger(sid, debut, fin, sources=("1", "2", "4", "3")):
     t_all, h_all = [], []
     cur = debut
     while cur < fin:
+        if time.time() - DEBUT > BUDGET_S:
+            log("  temps imparti dépassé, téléchargement interrompu")
+            break
         nxt = min(cur + timedelta(days=30), fin)
         data, erreurs = [], []
         for src in sources:
@@ -199,6 +206,15 @@ def charger_harmoniques(sid):
         if m.get("station_id") == sid and m.get("mois") == mois:
             return m
         log("Analyse harmonique à renouveler (nouveau mois).")
+        if m.get("station_id") == sid:
+            try:
+                m2 = ajuster(sid)
+            except Exception as e:  # noqa: BLE001
+                log(f"  nouvelle analyse impossible ({e}), on garde celle du mois précédent")
+                return m
+            with open(HARMO_FILE, "w", encoding="utf-8") as f:
+                json.dump(m2, f)
+            return m2
     m = ajuster(sid)
     os.makedirs(CACHE_DIR, exist_ok=True)
     with open(HARMO_FILE, "w", encoding="utf-8") as f:
