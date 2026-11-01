@@ -71,7 +71,7 @@ h2 { font-size: 17px; margin: 0 0 8px; }
   background: transparent; color: var(--encre); font: inherit; font-size: 24px; cursor: pointer;
 }
 .seuil button:focus-visible { outline: 3px solid var(--mer); outline-offset: 2px; }
-.seuil output { font-size: 28px; font-weight: 700; min-width: 4.2em; text-align: center; font-variant-numeric: tabular-nums; color: var(--sable); }
+.seuil output { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--sable); }
 .aide { font-size: 14px; color: var(--granit); margin: 6px 0 0; }
 footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
 .alerte { color: var(--alerte); }
@@ -98,13 +98,11 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
   </section>
 
   <section>
-    <h2>Hauteur d'eau minimale pour se baigner</h2>
+    <h2>Seuil de baignade</h2>
     <div class="seuil">
-      <button type="button" id="moins" aria-label="Baisser le seuil de 5 cm">−</button>
-      <output id="valeur-seuil">3,00 m</output>
-      <button type="button" id="plus" aria-label="Monter le seuil de 5 cm">+</button>
+      <output id="valeur-seuil">3,65 m</output>
     </div>
-    <p class="aide">Hauteur au-dessus du zéro des cartes, comme dans l'annuaire des marées. Réglage enregistré sur ce téléphone.</p>
+    <p class="aide">Hauteur au-dessus du zéro des cartes, comme dans l'annuaire des marées.</p>
   </section>
 
   <footer id="pied"></footer>
@@ -123,13 +121,13 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
   const metres = (h) => h.toFixed(2).replace(".", ",") + " m";
   const $ = (id) => document.getElementById(id);
 
-  let cfg = {}, data = null, seuil = 3.0;
+  const VERSION = "2026-11-01-seuil-fixe";
+  let cfg = {}, data = null, seuil = 3.65;
 
   function lireSeuil() {
-    try { const v = parseFloat(localStorage.getItem("seuil")); if (!isNaN(v)) return v; } catch (e) {}
-    return typeof cfg.seuil_baignade_m === "number" ? cfg.seuil_baignade_m : 3.0;
+    try { localStorage.removeItem("seuil"); } catch (e) {}
+    return typeof cfg.seuil_baignade_m === "number" ? cfg.seuil_baignade_m : 3.65;
   }
-  function ecrireSeuil(v) { try { localStorage.setItem("seuil", String(v)); } catch (e) {} }
 
   // Séries corrigées du décalage Croisic → Piriac et de l'écart mesuré
   function series() {
@@ -308,9 +306,8 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
         fetch("config.json?v=" + Date.now()).then((r) => r.json()).catch(() => ({})),
         fetch("data.json?v=" + Date.now()).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
       ]);
-      const premier = !data;
       cfg = c; data = d;
-      if (premier) seuil = lireSeuil();
+      seuil = lireSeuil();
       if (cfg.lieu) $("lieu").textContent = cfg.lieu;
       rendre();
     } catch (e) {
@@ -321,15 +318,18 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
     }
   }
 
-  function changer(delta) {
-    seuil = Math.round((seuil + delta) * 100) / 100;
-    seuil = Math.max(0, Math.min(8, seuil));
-    ecrireSeuil(seuil); rendre();
+  // Recharge la page si une nouvelle version a été publiée (contourne le cache)
+  async function verifierVersion() {
+    try {
+      const txt = await fetch("index.html?v=" + Date.now(), { cache: "no-store" }).then((r) => r.text());
+      const m = txt.match(/const VERSION = "([^"]+)"/);
+      if (m && m[1] !== VERSION) location.replace(location.pathname + "?v=" + Date.now());
+    } catch (e) {}
   }
-  $("moins").addEventListener("click", () => changer(-0.05));
-  $("plus").addEventListener("click", () => changer(0.05));
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) charger(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { charger(); verifierVersion(); } });
   setInterval(charger, 5 * 60e3);
+  setInterval(verifierVersion, 30 * 60e3);
+  verifierVersion();
   setInterval(rendre, 60e3);
   charger();
 })();
