@@ -100,9 +100,9 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
   <section>
     <h2>Hauteur d'eau minimale pour se baigner</h2>
     <div class="seuil">
-      <button type="button" id="moins" aria-label="Baisser le seuil de 10 cm">−</button>
+      <button type="button" id="moins" aria-label="Baisser le seuil de 5 cm">−</button>
       <output id="valeur-seuil">3,00 m</output>
-      <button type="button" id="plus" aria-label="Monter le seuil de 10 cm">+</button>
+      <button type="button" id="plus" aria-label="Monter le seuil de 5 cm">+</button>
     </div>
     <p class="aide">Hauteur au-dessus du zéro des cartes, comme dans l'annuaire des marées. Réglage enregistré sur ce téléphone.</p>
   </section>
@@ -321,12 +321,12 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
   }
 
   function changer(delta) {
-    seuil = Math.round((seuil + delta) * 10) / 10;
+    seuil = Math.round((seuil + delta) * 100) / 100;
     seuil = Math.max(0, Math.min(8, seuil));
     ecrireSeuil(seuil); rendre();
   }
-  $("moins").addEventListener("click", () => changer(-0.1));
-  $("plus").addEventListener("click", () => changer(0.1));
+  $("moins").addEventListener("click", () => changer(-0.05));
+  $("plus").addEventListener("click", () => changer(0.05));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) charger(); });
   setInterval(charger, 5 * 60e3);
   setInterval(rendre, 60e3);
