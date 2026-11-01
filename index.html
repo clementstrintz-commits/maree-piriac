@@ -213,7 +213,8 @@ footer { font-size: 13px; color: var(--granit); margin-top: 22px; }
     for (const [id, j] of [["auj", auj], ["dem", dem]]) {
       const ul = $(id);
       ul.innerHTML = "";
-      const liste = cr.filter(([a, b]) => jour(a) === j || jour(b) === j);
+      // Un créneau est rangé au jour où il commence ; aujourd'hui garde aussi celui commencé hier soir
+      const liste = cr.filter(([a, b]) => jour(a) === j || (id === "auj" && jour(b) === j));
       if (!liste.length) { ul.innerHTML = `<li class="vide">Jamais au-dessus de ${metres(seuil)}</li>`; continue; }
       for (const [a, b, ouvert] of liste) {
         const li = document.createElement("li");
